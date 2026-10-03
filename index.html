@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Регистрация/вход</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Underdog&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06111a;
+    --card: #1b2f42;
+    --field: #06121b;
+    --title: #f6c56e;
+    --label: #ea9540;
+    --hint: #4b4a47;
+    --btn: #e89bab;
+    --btn-text: #a8304e;
+    --text: #d9cdb4;
+    --radius: 28px;
+    --font: "Underdog", "Comic Sans MS", "Comic Neue", cursive, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { min-height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    font-family: var(--font);
+    text-transform: uppercase;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px 16px;
+  }
+  [hidden] { display: none !important; }
+  .card {
+    width: min(432px, 100%);
+    background: var(--card);
+    padding: 34px 36px 30px;
+    border-radius: var(--radius);
+  }
+  .card.cab { width: min(760px, 100%); padding: 36px 40px 36px; }
+  h1 { margin: 0 0 30px; font-weight: 400; font-size: 31px; line-height: 1.15; color: var(--title); overflow-wrap: anywhere; }
+  label { display: block; margin: 0 0 8px 6px; font-size: 19px; color: var(--label); }
+  input[type=text], input[type=password] {
+    display: block; width: 100%; height: 32px; margin: 0 0 30px;
+    background: var(--field); border: 0; border-radius: 0;
+    padding: 0 10px; font: inherit; font-size: 15px; color: var(--title);
+    text-transform: none;
+  }
+  input::placeholder { color: var(--hint); text-transform: uppercase; opacity: 1; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--label); outline-offset: 0; }
+  .go {
+    display: block; margin: 0 auto 14px; width: 146px; height: 30px;
+    background: var(--btn); color: var(--btn-text); border: 0; border-radius: 5px;
+    font: inherit; font-size: 19px; cursor: pointer;
+  }
+  .go:hover { filter: brightness(1.06); }
+  .go:disabled { opacity: .6; cursor: wait; }
+  .err { margin: 0 0 12px; text-align: center; font-size: 14px; color: var(--btn); }
+  .err:empty { display: none; }
+  .foot { margin: 0; text-align: center; font-size: 18px; line-height: 1.1; color: var(--title); }
+
+  /* ---------- личный кабинет ---------- */
+  .cols { display: grid; grid-template-columns: 100px 1fr; gap: 32px; align-items: start; }
+  .skin canvas { display: block; width: 100px; height: 150px; background: var(--field); }
+  .skin .small {
+    display: block; width: 100px; margin: 8px 0 0; padding: 6px 4px;
+    background: var(--btn); color: var(--btn-text); border: 0; border-radius: 5px;
+    font: inherit; font-size: 13px; line-height: 1.15; text-align: center; cursor: pointer;
+  }
+  .skin .small:hover { filter: brightness(1.06); }
+
+  .params { display: grid; grid-template-columns: 14px 58px 16px 1fr; column-gap: 8px; row-gap: 14px; align-items: start; }
+  .params .plus, .params .pc, .params .lab { line-height: 30px; font-size: 19px; color: var(--label); margin: 0; padding: 0; }
+  .params .lab { display: block; }
+  .params input.pct {
+    width: 58px; height: 30px; margin: 0; padding: 0 8px; text-align: right;
+    background: var(--field); border: 0; border-radius: 0; font: inherit; font-size: 16px; color: var(--title); text-transform: none;
+  }
+  .tail { display: flex; align-items: center; gap: 12px; margin: 30px 0 0; font-size: 19px; color: var(--label); cursor: pointer; }
+  .tail input {
+    -webkit-appearance: none; appearance: none;
+    display: grid; place-content: center; flex: none;
+    width: 26px; height: 26px; margin: 0; background: var(--field); border: 0; border-radius: 0; cursor: pointer;
+  }
+  .tail input::after { content: "✓"; display: none; color: var(--label); font-size: 20px; line-height: 1; }
+  .tail input:checked::after { display: block; }
+  .status { margin: 22px 0 0; min-height: 1.4em; font-size: 15px; color: var(--text); }
+  .status.ok { color: var(--title); }
+  .status.bad { color: var(--btn); }
+
+  .cab .go { margin: 34px auto 0; }
+  .intro { margin-top: 30px; font-size: 15px; line-height: 1.55; color: var(--text); text-transform: none; }
+  .intro p { margin: 0 0 14px; }
+  .intro p:last-child { margin-bottom: 0; }
+  .intro a { color: var(--label); overflow-wrap: anywhere; }
+
+  @media (max-width: 640px) {
+    .card, .card.cab { padding: 28px 22px; }
+    .cols { grid-template-columns: 1fr; gap: 24px; }
+    .skin .small { width: 100px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- РЕГИСТРАЦИЯ / ВХОД -->
+  <form class="card" id="form" autocomplete="off">
+    <h1>Регистрация/вход</h1>
+
+    <label for="name">Имя персонажа:</label>
+    <input id="name" type="text" maxlength="20" placeholder="введите любое имя..." required>
+
+    <label for="pass">Пароль:</label>
+    <input id="pass" type="password" placeholder="не от оригинального сайта, пж" required>
+
+    <button class="go" id="go" type="submit">Войти</button>
+    <p class="err" id="err" role="alert"></p>
+    <p class="foot">Обязательно зовите друзей для махачей вместе!</p>
+  </form>
+
+  <!-- ЛИЧНЫЙ КАБИНЕТ -->
+  <main class="card cab" id="cab" hidden>
+    <h1 id="cab-name"></h1>
+
+    <div class="cols">
+      <div class="skin">
+        <canvas id="skin" width="100" height="150" aria-label="Окрас персонажа"></canvas>
+        <button type="button" class="small" id="skin-btn">Загрузить окрас</button>
+        <input type="file" id="skin-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+      </div>
+
+      <div>
+        <div class="params" id="params"></div>
+        <label class="tail"><input type="checkbox" id="tail">Боевой хвост</label>
+        <p class="status" id="status" role="status"></p>
+      </div>
+    </div>
+
+    <button class="go" id="to-game" type="button">В игровую</button>
+
+    <div class="intro">
+      <p>Сайт создан для теста боевых параметров, поскольку оригинальный CatWar вместо возможности опробовать разные СП дал нам лотерею, в которой у нас завязаны глаза. Зовите друзей на махачи или пробуйте бег в чистом поле или против бота. Надеюсь, сайт вам понравится.</p>
+      <p>Для более "естественных" СП можно воспользоваться сайтом: <a href="https://netrey95-hub.github.io/skills/" target="_blank" rel="noopener">https://netrey95-hub.github.io/skills/</a></p>
+      <p>Спасибо варовцам за ваше творчество. Желаю всем бойцам хороших СП и быстрого реролла 🧡</p>
+      <p>P.s. сайт полностью создан ИИ. Не ругайтесь, я не умею кодить :с</p>
+    </div>
+  </main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+/* ===================================================================
+   НАСТРОЙКИ
+   =================================================================== */
+const SUPABASE_URL = "https://bqjdhpkcwoltvfmeobph.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ilo2vL7LZUo_MQU29m7tZg_UA-HEC4h";
+const GAME_URL = "game.html";          // куда ведёт кнопка «В игровую»
+
+const PARAMS = [
+  ["strike", "Сила удара"],
+  ["energy", "Количество энергии"],
+  ["regen",  "Скорость восстановления энергии"],
+  ["cw",     "Скорость вращения стрелки"],
+  ["ccw",    "Скорость движения против стрелки"],
+];
+
+// Сессия живёт в sessionStorage: каждая вкладка = отдельный игрок.
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true },
+});
+
+const $ = id => document.getElementById(id);
+
+/* ===================================================================
+   Вход и регистрация одним действием
+   =================================================================== */
+const Auth = {
+  async _email(name) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(name.toLowerCase()));
+    const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
+    return "p" + hex.slice(0, 32) + "@gmail.com";
+  },
+
+  async loginOrCreate(name, pass) {
+    const email = await this._email(name);
+
+    let { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (!error) return { id: data.user.id, name: data.user.user_metadata.name || name };
+
+    const res = await sb.auth.signUp({ email, password: pass, options: { data: { name } } });
+    if (res.error) {
+      const msg = (res.error.message || "").toLowerCase();
+      if (res.error.code === "user_already_exists" || msg.includes("already")) {
+        throw new Error("Это имя занято, а пароль не подходит.");
+      }
+      if (msg.includes("rate")) throw new Error("Слишком часто. Подожди минуту.");
+      throw new Error("Не получилось: " + res.error.message);
+    }
+    if (!res.data.session) {
+      throw new Error("В Supabase включено подтверждение почты — выключи его (Authentication → Sign In / Providers → Email).");
+    }
+    return { id: res.data.user.id, name };
+  },
+
+  async current() {
+    const { data } = await sb.auth.getSession();
+    const u = data.session && data.session.user;
+    return u ? { id: u.id, name: u.user_metadata.name } : null;
+  },
+};
+
+/* ===================================================================
+   Вход: форма
+   =================================================================== */
+const form = $("form"), err = $("err"), goBtn = $("go");
+
+form.addEventListener("submit", async e => {
+  e.preventDefault();
+  err.textContent = "";
+  const name = $("name").value.trim();
+  const pass = $("pass").value;
+  if (name.length < 2) { err.textContent = "Имя — минимум 2 символа."; return; }
+  if (pass.length < 6) { err.textContent = "Пароль — минимум 6 символов."; return; }
+
+  goBtn.disabled = true;
+  try {
+    const user = await Auth.loginOrCreate(name, pass);
+    form.reset();
+    openCabinet(user);
+  } catch (ex) {
+    err.textContent = ex.message;
+  } finally {
+    goBtn.disabled = false;
+  }
+});
+
+/* ===================================================================
+   Личный кабинет
+   =================================================================== */
+let me = null;                          // { id, name }
+const P = {};                           // проценты в десятых долях: 67 = 6.7%
+PARAMS.forEach(([k]) => P[k] = 0);
+
+const fmtPct = tenths => (tenths % 10 === 0 ? String(tenths / 10) : (tenths / 10).toFixed(1));
+const sum = () => PARAMS.reduce((s, [k]) => s + P[k], 0);
+
+// --- строки с параметрами
+const paramsBox = $("params");
+PARAMS.forEach(([k, label]) => {
+  paramsBox.insertAdjacentHTML("beforeend",
+    `<span class="plus">+</span>` +
+    `<input class="pct" id="p-${k}" type="text" inputmode="decimal" autocomplete="off" placeholder="0" aria-label="${label}">` +
+    `<span class="pc">%</span>` +
+    `<label class="lab" for="p-${k}">${label}</label>`);
+  $("p-" + k).addEventListener("input", e => onPct(k, e.target));
+});
+
+function onPct(key, input) {
+  // только цифры и одна точка/запятая, после неё одна цифра
+  let v = input.value.replace(",", ".").replace(/[^0-9.]/g, "");
+  const parts = v.split(".");
+  v = parts[0].slice(0, 3) + (parts.length > 1 ? "." + parts.slice(1).join("").slice(0, 1) : "");
+  if (v !== input.value) input.value = v;
+  const n = parseFloat(v);
+  P[key] = isFinite(n) ? Math.round(n * 10) : 0;
+  savedOk = false;
+  renderStatus();
+  if (sum() === 1000) queueSave({ params: { ...P } });
+}
+
+// --- статус под параметрами
+let flashMsg = "", flashBad = false, flashTimer = null, savedOk = false;
+function flash(msg, bad = false, ms = 3500) {
+  flashMsg = msg; flashBad = bad;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => { flashMsg = ""; renderStatus(); }, ms);
+  renderStatus();
+}
+function renderStatus() {
+  const el = $("status"), s = sum();
+  if (flashMsg) { el.textContent = flashMsg; el.className = "status" + (flashBad ? " bad" : ""); return; }
+  if (s === 1000) { el.textContent = savedOk ? "Сумма 100% — сохранено" : "Сумма 100%"; el.className = "status ok"; }
+  else { el.textContent = `Сумма: ${fmtPct(s)}% — должно быть 100%`; el.className = "status bad"; }
+}
+
+// --- сохранение (в таблицу profiles)
+let saveChain = Promise.resolve(), saveTimer = null, pending = {};
+function queueSave(patch, immediate = false) {
+  Object.assign(pending, patch);
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, immediate ? 0 : 500);
+}
+function flushSave() {
+  clearTimeout(saveTimer);
+  const patch = pending; pending = {};
+  if (!Object.keys(patch).length) return saveChain;
+  saveChain = saveChain.then(async () => {
+    const { error } = await sb.from("profiles").upsert({ id: me.id, name: me.name, ...patch });
+    if (error) { flash(dbError(error), true, 9000); return; }
+    if (patch.params) { savedOk = true; renderStatus(); }
+  });
+  return saveChain;
+}
+function dbError(error) {
+  const m = (error.message || "") + " " + (error.code || "");
+  if (m.includes("PGRST205") || m.includes("profiles")) return "Не удалось сохранить: в Supabase нет таблицы profiles (нужно выполнить SQL).";
+  return "Не удалось сохранить: " + error.message;
+}
+
+// --- окрас
+const skinCanvas = $("skin"), skinCtx = skinCanvas.getContext("2d");
+function drawSkin(dataUrl) {
+  skinCtx.clearRect(0, 0, 100, 150);
+  if (!dataUrl) return;
+  const img = new Image();
+  img.onload = () => { skinCtx.clearRect(0, 0, 100, 150); skinCtx.drawImage(img, 0, 0, 100, 150); };
+  img.src = dataUrl;
+}
+$("skin-btn").addEventListener("click", () => $("skin-file").click());
+$("skin-file").addEventListener("change", e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { flash("Файл больше 2 МБ.", true); return; }
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas"); c.width = 100; c.height = 150;
+    const ctx = c.getContext("2d");
+    const k = Math.min(100 / img.width, 150 / img.height), w = img.width * k, h = img.height * k;
+    ctx.imageSmoothingEnabled = k < 1;
+    ctx.drawImage(img, (100 - w) / 2, 150 - h, w, h);
+    const data = c.toDataURL("image/png");
+    URL.revokeObjectURL(url);
+    drawSkin(data);
+    queueSave({ skin: data }, true);
+    if (img.width !== 100 || img.height !== 150) flash(`Картинка ${img.width}×${img.height} подогнана под 100×150.`);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); flash("Не удалось открыть картинку.", true); };
+  img.src = url;
+});
+
+// --- боевой хвост
+$("tail").addEventListener("change", e => queueSave({ tail: e.target.checked }, true));
+
+// --- в игровую
+$("to-game").addEventListener("click", async () => {
+  if (sum() !== 1000) { flash(`Сумма: ${fmtPct(sum())}% — должно быть 100%, иначе в игровую нельзя.`, true, 5000); return; }
+  queueSave({ params: { ...P } }, true);
+  await flushSave();
+  location.href = GAME_URL;
+});
+
+// --- открыть кабинет и подгрузить сохранённое
+async function openCabinet(user) {
+  me = user;
+  form.hidden = true;
+  $("cab").hidden = false;
+  document.title = user.name;
+  $("cab-name").textContent = user.name;
+
+  const { data, error } = await sb.from("profiles").select("params, tail, skin").eq("id", me.id).maybeSingle();
+  if (error) { flash(dbError(error), true, 9000); }
+  const prof = data || {};
+  PARAMS.forEach(([k]) => {
+    P[k] = Math.round((prof.params && prof.params[k]) || 0);
+    $("p-" + k).value = P[k] ? fmtPct(P[k]) : "";
+  });
+  $("tail").checked = !!prof.tail;
+  drawSkin(prof.skin);
+  savedOk = sum() === 1000;
+  renderStatus();
+}
+
+// уже вошёл в этой вкладке
+Auth.current().then(u => { if (u) openCabinet(u); });
+</script>
+</body>
+</html>
