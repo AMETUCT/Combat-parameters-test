@@ -161,7 +161,7 @@ const SUPABASE_KEY = "sb_publishable_ilo2vL7LZUo_MQU29m7tZg_UA-HEC4h";
 const COLS = 10, ROWS = 6, SIZE = 1000;
 const CW = SIZE / COLS, CH = SIZE / ROWS;      // клетка 100 × 166.7
 const SKIN_W = 100, SKIN_H = 150;
-const MOVE_DELAY = 100;                         // мс между шагами
+const MOVE_DELAY = 80;                          // мс между шагами
 
 const LOCATIONS = [
   { id: "loc1",      name: "Локация 1" },
@@ -178,6 +178,7 @@ const KEYS = {
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true },
+  realtime: { params: { eventsPerSecond: 30 } },
 });
 const $ = id => document.getElementById(id);
 
@@ -224,7 +225,18 @@ function buildLocationButtons() {
 function markLocation() {
   document.querySelectorAll(".loc").forEach(b => b.classList.toggle("on", +b.dataset.i === locIndex));
 }
-function setNet(t) { $("net").textContent = t; }
+let netMsg = "", pingText = "", trackTimer = null;
+function renderNet() { $("net").textContent = netMsg || pingText; }
+function setNet(t) { netMsg = t; renderNet(); }
+function onPong(m) {
+  if (!m || m.k !== myKey || typeof m.s !== "number") return;
+  pingText = "Пинг: " + Math.round(performance.now() - m.s) + " мс";
+  renderNet();
+}
+function sendPing() {
+  if (ch && subscribed) ch.send({ type: "broadcast", event: "ping", payload: { k: myKey, s: performance.now() } });
+}
+setInterval(sendPing, 3000);
 
 function joinLocation(i) {
   if (ch) { const old = ch; ch = null; sb.removeChannel(old); }
@@ -234,14 +246,18 @@ function joinLocation(i) {
   markLocation(); setNet("Подключение…"); requestDraw();
   startChat(i);
 
-  const c = sb.channel("loc:" + LOCATIONS[i].id, { config: { presence: { key: myKey } } });
+  clearTimeout(trackTimer); trackTimer = null; pingText = ""; renderNet();
+  const c = sb.channel("loc:" + LOCATIONS[i].id, { config: { presence: { key: myKey }, broadcast: { self: true } } });
   ch = c;
   c.on("presence", { event: "sync" }, () => { if (c === ch) onSync(); })
+   .on("broadcast", { event: "mv" }, ({ payload }) => { if (c === ch) onMove(payload); })
+   .on("broadcast", { event: "ping" }, ({ payload }) => { if (c === ch) onPong(payload); })
    .subscribe(status => {
      if (c !== ch) return;
      if (status === "SUBSCRIBED") {
        subscribed = true; setNet("");
-       if (placed) pushState(); else maybePlace();
+       if (placed) pushState(true); else maybePlace();
+       setTimeout(() => { if (c === ch) sendPing(); }, 300);
        // на случай, если событие sync не придёт в пустой локации
        setTimeout(() => { if (c === ch && !gotSync) { gotSync = true; maybePlace(); } }, 1200);
      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
@@ -257,12 +273,20 @@ function readMeta(key, m) {
 }
 
 function onSync() {
-  const st = ch.presenceState(), next = {};
+  const st = ch.presenceState(), now = Date.now(), next = {};
   for (const key of Object.keys(st)) {
     if (key === myKey) continue;
     const metas = st[key];
     const p = readMeta(key, metas[metas.length - 1] || {});
-    if (p) { next[key] = p; loadSkin(p.uid); }
+    if (!p) continue;
+    const old = others[key];
+    next[key] = { ...(old && old.t > p.t ? old : p), confirmed: true, seen: now };
+    loadSkin(p.uid);
+  }
+  // пришедшие по broadcast, но ещё не попавшие в presence, живут пару секунд
+  for (const key of Object.keys(others)) {
+    const o = others[key];
+    if (!next[key] && !o.confirmed && now - o.seen < 2500) next[key] = o;
   }
   others = next;
   gotSync = true;
@@ -275,10 +299,32 @@ function takenCells() {
   Object.values(others).forEach(p => s.add(p.x + "," + p.y));
   return s;
 }
-function pushState() {
-  if (ch && subscribed && mine) {
-    ch.track({ uid: me.id, name: me.name, x: mine.x, y: mine.y, t: mine.t, battle });
+// Ход сразу рассылается через broadcast (быстро), а в presence положение
+// записывается не чаще раза в 300 мс — оно нужно только тем, кто заходит позже.
+function pushState(immediate = false) {
+  if (!(ch && subscribed && mine)) return;
+  const snap = () => ({ uid: me.id, name: me.name, x: mine.x, y: mine.y, t: mine.t, battle });
+  ch.send({ type: "broadcast", event: "mv", payload: { k: myKey, ...snap() } });
+  if (immediate) {
+    clearTimeout(trackTimer); trackTimer = null;
+    ch.track(snap());
+  } else if (!trackTimer) {
+    trackTimer = setTimeout(() => {
+      trackTimer = null;
+      if (ch && subscribed && mine) ch.track(snap());
+    }, 300);
   }
+}
+function onMove(m) {
+  if (!m || typeof m.k !== "string" || m.k === myKey) return;
+  const p = readMeta(m.k, m);
+  if (!p) return;
+  const old = others[p.key];
+  if (old && old.t > p.t) return;
+  others[p.key] = { ...p, confirmed: old ? old.confirmed : false, seen: Date.now() };
+  loadSkin(p.uid);
+  if (placed) resolveCollision();
+  requestDraw();
 }
 function maybePlace() {
   if (placed || !subscribed || !gotSync) return;
@@ -288,7 +334,7 @@ function maybePlace() {
   const [x, y] = free[Math.floor(Math.random() * free.length)];
   mine = { x, y, px: null, py: null, t: Date.now() };
   placed = true;
-  pushState(); requestDraw();
+  pushState(true); requestDraw();
 }
 
 // Если двое одновременно заняли одну клетку, остаётся тот, кто пришёл раньше;
@@ -311,7 +357,7 @@ function resolveCollision() {
   }
   if (!target) return;
   mine = { x: target[0], y: target[1], px: null, py: null, t: Date.now() };
-  pushState();
+  pushState(true);
 }
 
 /* ===================================================================
@@ -379,7 +425,7 @@ canvas.addEventListener("mouseleave", () => { tip.hidden = true; });
 $("battle").addEventListener("click", () => {
   battle = !battle;
   $("battle").textContent = battle ? "Выйти из боережима" : "Войти в боережим";
-  pushState(); requestDraw();
+  pushState(true); requestDraw();
 });
 
 /* ===================================================================
