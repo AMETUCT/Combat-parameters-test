@@ -75,7 +75,8 @@
   }
   .chat-form button:hover { background: #0d1e2b; }
   .chat-list { flex: 1; min-height: 0; overflow-y: auto; text-transform: none; font-size: 15px; line-height: 1.35; }
-  .msg { padding: 3px 2px; overflow-wrap: anywhere; animation: drop .18s ease-out; }
+  .msg { padding: 6px 2px; overflow-wrap: anywhere; animation: drop .18s ease-out; }
+  .msg:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,.1); }
   @keyframes drop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 
   /* ---------- поле ---------- */
@@ -204,7 +205,6 @@ const skins = new Map();                        // uid -> Image | null
 
   buildLocationButtons();
   loadSkin(me.id);
-  startChat();
   const saved = parseInt(sessionStorage.getItem("loc"), 10);
   joinLocation(saved >= 0 && saved < LOCATIONS.length ? saved : 0);
 })();
@@ -232,6 +232,7 @@ function joinLocation(i) {
   sessionStorage.setItem("loc", String(i));
   others = {}; mine = null; placed = false; subscribed = false; gotSync = false;
   markLocation(); setNet("Подключение…"); requestDraw();
+  startChat(i);
 
   const c = sb.channel("loc:" + LOCATIONS[i].id, { config: { presence: { key: myKey } } });
   ch = c;
@@ -317,11 +318,12 @@ function resolveCollision() {
    Движение
    =================================================================== */
 let lastMove = 0;
-function tryMove(dx, dy) {
+function tryMove(dx, dy) { if (mine) moveTo(mine.x + dx, mine.y + dy); }
+function moveTo(nx, ny) {
   if (!placed) return;
   const now = performance.now();
   if (now - lastMove < MOVE_DELAY) return;
-  const nx = mine.x + dx, ny = mine.y + dy;
+  if (nx === mine.x && ny === mine.y) return;
   if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) return;
   if (takenCells().has(nx + "," + ny)) return;
   lastMove = now;
@@ -356,8 +358,7 @@ canvas.addEventListener("click", e => {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   const c = cellAt(e);
   if (!c || !placed) return;
-  const dx = c.x - mine.x, dy = c.y - mine.y;
-  if ((dx || dy) && Math.abs(dx) <= 1 && Math.abs(dy) <= 1) tryMove(dx, dy);
+  moveTo(c.x, c.y);
 });
 canvas.addEventListener("mousemove", e => {
   const c = cellAt(e);
@@ -367,10 +368,7 @@ canvas.addEventListener("mousemove", e => {
     tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
   } else tip.hidden = true;
   let pointer = false;
-  if (c && placed && !p) {
-    const dx = c.x - mine.x, dy = c.y - mine.y;
-    pointer = Math.abs(dx) <= 1 && Math.abs(dy) <= 1;
-  }
+  if (c && placed && !p) pointer = true;
   canvas.style.cursor = pointer ? "pointer" : "default";
 });
 canvas.addEventListener("mouseleave", () => { tip.hidden = true; });
@@ -409,8 +407,8 @@ function requestDraw() {
 }
 
 function drawPlayer(x, y, uid, name, inBattle) {
-  const px = x * CW + (CW - SKIN_W) / 2;
-  const py = y * CH + (CH - SKIN_H) / 2;
+  const px = x * CW;          // левый верхний угол клетки, как в Catwar
+  const py = y * CH;
   const img = skins.get(uid);
   if (img) ctx.drawImage(img, px, py, SKIN_W, SKIN_H);
   else {
@@ -455,9 +453,13 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(requestDra
    Чат (общий для всех локаций; при обновлении страницы очищается)
    =================================================================== */
 let chatCh = null, lastSent = 0;
-function startChat() {
-  chatCh = sb.channel("chat", { config: { broadcast: { self: true } } });
-  chatCh.on("broadcast", { event: "msg" }, ({ payload }) => {
+function startChat(i) {
+  if (chatCh) { const old = chatCh; chatCh = null; sb.removeChannel(old); }
+  $("chat-list").textContent = "";
+  const c = sb.channel("chat:" + LOCATIONS[i].id, { config: { broadcast: { self: true } } });
+  chatCh = c;
+  c.on("broadcast", { event: "msg" }, ({ payload }) => {
+    if (c !== chatCh) return;
     if (!payload || typeof payload.text !== "string" || typeof payload.name !== "string") return;
     addMessage(payload.text.slice(0, 200), payload.name.slice(0, 20));
   }).subscribe();
