@@ -99,7 +99,7 @@ const Store = {
   async _email(name) {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(name.toLowerCase()));
     const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
-    return "p" + hex.slice(0, 32) + "@murwar.game";
+    return "p" + hex.slice(0, 32) + "@gmail.com";
   },
 
   async loginOrCreate(name, pass) {
