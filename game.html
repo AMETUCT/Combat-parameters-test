@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Игровая</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Underdog&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #06111a;
+    --card: #1b2f42;
+    --field: #06121b;
+    --title: #f6c56e;
+    --label: #ea9540;
+    --btn: #e89bab;
+    --btn-text: #a8304e;
+    --text: #d9cdb4;
+    --muted: #6f8294;
+    --radius: 8px;
+    --gap: 12px;
+    /* размер поля: до 1000px, но не выше экрана. Чтобы всегда было ровно 1000px, замени на 1000px */
+    --field-size: min(1000px, calc(100vh - 92px));
+    --font: "Underdog", "Comic Sans MS", "Comic Neue", cursive, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: var(--font); text-transform: uppercase;
+    padding: 16px;
+  }
+  button, input { font: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--title); outline-offset: 1px; }
+
+  .page { width: fit-content; max-width: 100%; margin: 0 auto; }
+
+  .lk {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 72px; height: 32px; margin-bottom: var(--gap);
+    background: var(--card); color: var(--label); border-radius: var(--radius);
+    text-decoration: none; font-size: 20px;
+  }
+  .lk:hover { filter: brightness(1.12); }
+
+  .main {
+    display: grid;
+    grid-template-columns: 250px var(--field-size) 240px;
+    gap: var(--gap);
+    align-items: stretch;
+  }
+  .panel { background: var(--card); border-radius: var(--radius); }
+
+  /* ---------- чат ---------- */
+  .chat {
+    height: 0; min-height: 100%;           /* высота = высоте поля, содержимое не растягивает ряд */
+    display: flex; flex-direction: column; padding: 14px 12px 12px; overflow: hidden;
+  }
+  .chat h2 { margin: 0 0 10px 2px; font-weight: 400; font-size: 17px; color: var(--label); }
+  .chat-form {
+    display: flex; gap: 6px; padding-bottom: 12px; margin-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,.12);
+  }
+  .chat-form input {
+    flex: 1; min-width: 0; height: 28px; padding: 0 8px;
+    background: var(--field); color: var(--title); border: 0; border-radius: 4px;
+    font-size: 14px; text-transform: none;
+  }
+  .chat-form input::placeholder { color: #4b5560; text-transform: uppercase; opacity: 1; }
+  .chat-form button {
+    width: 38px; height: 28px; padding: 0;
+    background: var(--field); color: var(--label); border: 1px solid var(--label); border-radius: 4px; font-size: 14px;
+  }
+  .chat-form button:hover { background: #0d1e2b; }
+  .chat-list { flex: 1; min-height: 0; overflow-y: auto; text-transform: none; font-size: 15px; line-height: 1.35; }
+  .msg { padding: 3px 2px; overflow-wrap: anywhere; animation: drop .18s ease-out; }
+  @keyframes drop { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- поле ---------- */
+  .field { border-radius: var(--radius); overflow: hidden; background: var(--card); line-height: 0; }
+  .field canvas { display: block; width: 100%; height: auto; aspect-ratio: 1 / 1; touch-action: manipulation; }
+
+  /* ---------- правая панель ---------- */
+  .side { height: 0; min-height: 100%; display: flex; flex-direction: column; }
+  .net { margin: 0; min-height: 1.3em; font-size: 14px; color: var(--muted); text-transform: none; }
+  .spacer { flex: 1; }
+  .btn-battle {
+    width: 100%; height: 40px; margin-bottom: 32px;
+    background: var(--btn); color: var(--btn-text); border: 0; border-radius: var(--radius); font-size: 18px;
+  }
+  .btn-battle:hover { filter: brightness(1.06); }
+  .locs { display: flex; flex-direction: column; gap: 8px; }
+  .loc {
+    width: 100%; height: 40px;
+    background: var(--card); color: var(--label); border: 2px solid transparent; border-radius: var(--radius); font-size: 22px;
+  }
+  .loc:hover { filter: brightness(1.12); }
+  .loc.on { border-color: var(--title); }
+
+  #tip {
+    position: fixed; z-index: 10; pointer-events: none;
+    padding: 4px 9px; background: var(--field); color: var(--title);
+    border: 1px solid rgba(246,197,110,.35); border-radius: 5px; font-size: 14px; text-transform: none; white-space: nowrap;
+  }
+  #tip[hidden] { display: none; }
+
+  @media (max-width: 900px) {
+    :root { --field-size: calc(100vw - 32px); }
+    .main { grid-template-columns: 1fr; }
+    .field { order: 1; }
+    .side { order: 2; height: auto; min-height: 0; }
+    .chat { order: 3; height: 300px; min-height: 0; }
+    .spacer { display: none; }
+    .btn-battle { margin: 12px 0 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .msg { animation: none; } }
+</style>
+</head>
+<body>
+  <div class="page">
+    <a class="lk" href="index.html">ЛК</a>
+
+    <div class="main">
+      <section class="chat panel" aria-label="Чат">
+        <h2>Чат</h2>
+        <form class="chat-form" id="chat-form" autocomplete="off">
+          <input id="chat-input" type="text" maxlength="200" placeholder="сообщение...">
+          <button type="submit">ОК</button>
+        </form>
+        <div class="chat-list" id="chat-list" aria-live="polite"></div>
+      </section>
+
+      <section class="field">
+        <canvas id="field" width="1000" height="1000" aria-label="Игровое поле 10 на 6 клеток"></canvas>
+      </section>
+
+      <aside class="side panel" style="background:none">
+        <p class="net" id="net">Подключение…</p>
+        <div class="spacer"></div>
+        <button class="btn-battle" id="battle" type="button">Войти в боережим</button>
+        <nav class="locs" id="locs" aria-label="Локации"></nav>
+      </aside>
+    </div>
+  </div>
+
+  <div id="tip" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+/* ===================================================================
+   НАСТРОЙКИ
+   =================================================================== */
+const SUPABASE_URL = "https://bqjdhpkcwoltvfmeobph.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ilo2vL7LZUo_MQU29m7tZg_UA-HEC4h";
+
+const COLS = 10, ROWS = 6, SIZE = 1000;
+const CW = SIZE / COLS, CH = SIZE / ROWS;      // клетка 100 × 166.7
+const SKIN_W = 100, SKIN_H = 150;
+const MOVE_DELAY = 100;                         // мс между шагами
+
+const LOCATIONS = [
+  { id: "loc1",      name: "Локация 1" },
+  { id: "loc2",      name: "Локация 2" },
+  { id: "butterfly", name: "Бабочка" },
+  { id: "bot",       name: "Бот-игрок" },
+];
+
+// клавиши по физическому положению (работают и в русской раскладке)
+const KEYS = {
+  KeyW: [0, -1], KeyS: [0, 1], KeyA: [-1, 0], KeyD: [1, 0],
+  KeyQ: [-1, -1], KeyE: [1, -1], KeyZ: [-1, 1], KeyX: [1, 1], KeyC: [1, 1],
+};
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true },
+});
+const $ = id => document.getElementById(id);
+
+/* ===================================================================
+   Состояние
+   =================================================================== */
+let me = null;                                  // { id, name }
+const myKey = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)) ;
+let ch = null;                                  // канал текущей локации
+let locIndex = 0;
+let subscribed = false, gotSync = false, placed = false;
+let mine = null;                                // { x, y, t, px, py }
+let battle = false;
+let others = {};                                // key -> { key, uid, name, x, y, t, battle }
+const skins = new Map();                        // uid -> Image | null
+
+/* ===================================================================
+   Запуск
+   =================================================================== */
+(async function boot() {
+  const { data } = await sb.auth.getSession();
+  const u = data.session && data.session.user;
+  if (!u) { location.replace("index.html"); return; }
+  me = { id: u.id, name: (u.user_metadata && u.user_metadata.name) || "Игрок" };
+
+  buildLocationButtons();
+  loadSkin(me.id);
+  startChat();
+  const saved = parseInt(sessionStorage.getItem("loc"), 10);
+  joinLocation(saved >= 0 && saved < LOCATIONS.length ? saved : 0);
+})();
+
+/* ===================================================================
+   Локации и присутствие игроков (Supabase Realtime Presence)
+   =================================================================== */
+function buildLocationButtons() {
+  const box = $("locs");
+  LOCATIONS.forEach((l, i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "loc"; b.textContent = l.name; b.dataset.i = i;
+    b.addEventListener("click", () => { if (i !== locIndex) joinLocation(i); });
+    box.appendChild(b);
+  });
+}
+function markLocation() {
+  document.querySelectorAll(".loc").forEach(b => b.classList.toggle("on", +b.dataset.i === locIndex));
+}
+function setNet(t) { $("net").textContent = t; }
+
+function joinLocation(i) {
+  if (ch) { const old = ch; ch = null; sb.removeChannel(old); }
+  locIndex = i;
+  sessionStorage.setItem("loc", String(i));
+  others = {}; mine = null; placed = false; subscribed = false; gotSync = false;
+  markLocation(); setNet("Подключение…"); requestDraw();
+
+  const c = sb.channel("loc:" + LOCATIONS[i].id, { config: { presence: { key: myKey } } });
+  ch = c;
+  c.on("presence", { event: "sync" }, () => { if (c === ch) onSync(); })
+   .subscribe(status => {
+     if (c !== ch) return;
+     if (status === "SUBSCRIBED") {
+       subscribed = true; setNet("");
+       if (placed) pushState(); else maybePlace();
+       // на случай, если событие sync не придёт в пустой локации
+       setTimeout(() => { if (c === ch && !gotSync) { gotSync = true; maybePlace(); } }, 1200);
+     } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+       subscribed = false; setNet("Нет связи…");
+     }
+   });
+}
+
+function readMeta(key, m) {
+  const x = Number(m.x), y = Number(m.y);
+  if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= COLS || y >= ROWS) return null;
+  return { key, uid: String(m.uid || ""), name: String(m.name || "?").slice(0, 20), x, y, t: Number(m.t) || 0, battle: !!m.battle };
+}
+
+function onSync() {
+  const st = ch.presenceState(), next = {};
+  for (const key of Object.keys(st)) {
+    if (key === myKey) continue;
+    const metas = st[key];
+    const p = readMeta(key, metas[metas.length - 1] || {});
+    if (p) { next[key] = p; loadSkin(p.uid); }
+  }
+  others = next;
+  gotSync = true;
+  if (!placed) maybePlace(); else resolveCollision();
+  requestDraw();
+}
+
+function takenCells() {
+  const s = new Set();
+  Object.values(others).forEach(p => s.add(p.x + "," + p.y));
+  return s;
+}
+function pushState() {
+  if (ch && subscribed && mine) {
+    ch.track({ uid: me.id, name: me.name, x: mine.x, y: mine.y, t: mine.t, battle });
+  }
+}
+function maybePlace() {
+  if (placed || !subscribed || !gotSync) return;
+  const taken = takenCells(), free = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!taken.has(x + "," + y)) free.push([x, y]);
+  if (!free.length) { setNet("Локация заполнена"); return; }
+  const [x, y] = free[Math.floor(Math.random() * free.length)];
+  mine = { x, y, px: null, py: null, t: Date.now() };
+  placed = true;
+  pushState(); requestDraw();
+}
+
+// Если двое одновременно заняли одну клетку, остаётся тот, кто пришёл раньше;
+// второй (его же браузер) отступает на прежнюю или свободную клетку.
+function resolveCollision() {
+  if (!placed) return;
+  const rivals = Object.values(others).filter(p => p.x === mine.x && p.y === mine.y);
+  if (!rivals.length) return;
+  const all = rivals.concat([{ key: myKey, t: mine.t }]);
+  all.sort((a, b) => (a.t - b.t) || (a.key < b.key ? -1 : 1));
+  if (all[0].key === myKey) return;
+
+  const taken = takenCells();
+  let target = null;
+  if (mine.px !== null && !taken.has(mine.px + "," + mine.py)) target = [mine.px, mine.py];
+  if (!target) {
+    const free = [];
+    for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (!taken.has(x + "," + y)) free.push([x, y]);
+    if (free.length) target = free[Math.floor(Math.random() * free.length)];
+  }
+  if (!target) return;
+  mine = { x: target[0], y: target[1], px: null, py: null, t: Date.now() };
+  pushState();
+}
+
+/* ===================================================================
+   Движение
+   =================================================================== */
+let lastMove = 0;
+function tryMove(dx, dy) {
+  if (!placed) return;
+  const now = performance.now();
+  if (now - lastMove < MOVE_DELAY) return;
+  const nx = mine.x + dx, ny = mine.y + dy;
+  if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) return;
+  if (takenCells().has(nx + "," + ny)) return;
+  lastMove = now;
+  mine = { x: nx, y: ny, px: mine.x, py: mine.y, t: Date.now() };
+  pushState(); requestDraw();
+}
+
+window.addEventListener("keydown", e => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const d = KEYS[e.code];
+  if (!d) return;
+  e.preventDefault();
+  tryMove(d[0], d[1]);
+});
+
+const canvas = $("field"), ctx = canvas.getContext("2d"), tip = $("tip");
+
+function cellAt(e) {
+  const r = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - r.left) / r.width * COLS);
+  const y = Math.floor((e.clientY - r.top) / r.height * ROWS);
+  return x >= 0 && y >= 0 && x < COLS && y < ROWS ? { x, y } : null;
+}
+function playerAt(c) {
+  if (placed && mine.x === c.x && mine.y === c.y) return { name: me.name };
+  return Object.values(others).find(p => p.x === c.x && p.y === c.y) || null;
+}
+
+canvas.addEventListener("click", e => {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const c = cellAt(e);
+  if (!c || !placed) return;
+  const dx = c.x - mine.x, dy = c.y - mine.y;
+  if ((dx || dy) && Math.abs(dx) <= 1 && Math.abs(dy) <= 1) tryMove(dx, dy);
+});
+canvas.addEventListener("mousemove", e => {
+  const c = cellAt(e);
+  const p = c && playerAt(c);
+  if (p) {
+    tip.textContent = p.name; tip.hidden = false;
+    tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
+  } else tip.hidden = true;
+  let pointer = false;
+  if (c && placed && !p) {
+    const dx = c.x - mine.x, dy = c.y - mine.y;
+    pointer = Math.abs(dx) <= 1 && Math.abs(dy) <= 1;
+  }
+  canvas.style.cursor = pointer ? "pointer" : "default";
+});
+canvas.addEventListener("mouseleave", () => { tip.hidden = true; });
+
+/* ===================================================================
+   Боережим
+   =================================================================== */
+$("battle").addEventListener("click", () => {
+  battle = !battle;
+  $("battle").textContent = battle ? "Выйти из боережима" : "Войти в боережим";
+  pushState(); requestDraw();
+});
+
+/* ===================================================================
+   Окрасы игроков (берём из таблицы profiles)
+   =================================================================== */
+function loadSkin(uid) {
+  if (!uid || skins.has(uid)) return;
+  skins.set(uid, null);
+  sb.from("profiles").select("skin").eq("id", uid).maybeSingle().then(({ data }) => {
+    if (!data || typeof data.skin !== "string" || !data.skin.startsWith("data:image/")) return;
+    const img = new Image();
+    img.onload = () => { skins.set(uid, img); requestDraw(); };
+    img.src = data.skin;
+  });
+}
+
+/* ===================================================================
+   Отрисовка
+   =================================================================== */
+let drawQueued = false;
+function requestDraw() {
+  if (drawQueued) return;
+  drawQueued = true;
+  requestAnimationFrame(() => { drawQueued = false; draw(); });
+}
+
+function drawPlayer(x, y, uid, name, inBattle) {
+  const px = x * CW + (CW - SKIN_W) / 2;
+  const py = y * CH + (CH - SKIN_H) / 2;
+  const img = skins.get(uid);
+  if (img) ctx.drawImage(img, px, py, SKIN_W, SKIN_H);
+  else {
+    ctx.fillStyle = "rgba(6,18,27,.75)"; ctx.fillRect(px, py, SKIN_W, SKIN_H);
+    ctx.strokeStyle = "rgba(234,149,64,.6)"; ctx.lineWidth = 2; ctx.strokeRect(px + 1, py + 1, SKIN_W - 2, SKIN_H - 2);
+    ctx.fillStyle = "#ea9540"; ctx.font = "48px Underdog, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText((name || "?").trim().charAt(0).toUpperCase(), px + SKIN_W / 2, py + SKIN_H / 2);
+  }
+  if (inBattle) {                              // зелёная стрелка (заготовка, потом настроим)
+    const cx = px + SKIN_W / 2, cy = py + SKIN_H / 2;
+    ctx.save();
+    ctx.globalAlpha = .92;
+    ctx.fillStyle = "#3ddc6a"; ctx.strokeStyle = "rgba(0,0,0,.55)"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 36); ctx.lineTo(cx + 24, cy - 4); ctx.lineTo(cx + 10, cy - 4);
+    ctx.lineTo(cx + 10, cy + 32); ctx.lineTo(cx - 10, cy + 32); ctx.lineTo(cx - 10, cy - 4);
+    ctx.lineTo(cx - 24, cy - 4); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function draw() {
+  ctx.fillStyle = "#1b2f42";
+  ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // едва заметная сетка
+  ctx.strokeStyle = "rgba(255,255,255,.06)"; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 1; i < COLS; i++) { const x = Math.round(i * CW) + .5; ctx.moveTo(x, 0); ctx.lineTo(x, SIZE); }
+  for (let j = 1; j < ROWS; j++) { const y = Math.round(j * CH) + .5; ctx.moveTo(0, y); ctx.lineTo(SIZE, y); }
+  ctx.stroke();
+
+  Object.values(others).forEach(p => drawPlayer(p.x, p.y, p.uid, p.name, p.battle));
+  if (placed) drawPlayer(mine.x, mine.y, me.id, me.name, battle);
+}
+draw();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(requestDraw);
+
+/* ===================================================================
+   Чат (общий для всех локаций; при обновлении страницы очищается)
+   =================================================================== */
+let chatCh = null, lastSent = 0;
+function startChat() {
+  chatCh = sb.channel("chat", { config: { broadcast: { self: true } } });
+  chatCh.on("broadcast", { event: "msg" }, ({ payload }) => {
+    if (!payload || typeof payload.text !== "string" || typeof payload.name !== "string") return;
+    addMessage(payload.text.slice(0, 200), payload.name.slice(0, 20));
+  }).subscribe();
+}
+function addMessage(text, name) {
+  const list = $("chat-list"), d = document.createElement("div");
+  d.className = "msg";
+  d.textContent = text + " - " + name;
+  list.prepend(d);
+  while (list.children.length > 100) list.lastChild.remove();
+}
+$("chat-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const input = $("chat-input"), text = input.value.trim();
+  if (!text || !chatCh) return;
+  const now = Date.now();
+  if (now - lastSent < 600) return;
+  lastSent = now;
+  chatCh.send({ type: "broadcast", event: "msg", payload: { text: text.slice(0, 200), name: me.name } });
+  input.value = "";
+  input.focus();
+});
+$("chat-input").addEventListener("keydown", e => { if (e.key === "Escape") e.target.blur(); });
+
+window.addEventListener("pagehide", () => { try { if (ch) ch.untrack(); } catch (_) {} });
+</script>
+</body>
+</html>
